@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+dist/
+build/
+/release/
+/releases/
+/main.js
+.env
+.env.local
+AGENTS.md
+spec/
