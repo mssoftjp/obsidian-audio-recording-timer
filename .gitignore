@@ -8,4 +8,3 @@ build/
 .env
 .env.local
 AGENTS.md
-spec/

@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      - run: npm ci
+      - name: Verify release version
+        run: node scripts/verify-release.mjs
+      - run: npm run build
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cp dist/main.js release/main.js
+          cp dist/manifest.json release/manifest.json
+          if [ -f dist/styles.css ]; then cp dist/styles.css release/styles.css; fi
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+
