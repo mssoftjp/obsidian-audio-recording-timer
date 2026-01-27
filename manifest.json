@@ -1,8 +1,8 @@
 {
-  "id": "timer-recorder",
-  "name": "Timer recorder",
+  "id": "audio-recording-timer",
+  "name": "Audio Recording Timer",
   "version": "0.1.0",
-  "minAppVersion": "1.5.0",
+  "minAppVersion": "1.8.0",
   "description": "Start audio recording with a countdown or end time.",
   "author": "Musashino Software",
   "isDesktopOnly": false

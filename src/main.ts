@@ -3,6 +3,7 @@ import { Notice, Platform, Plugin } from "obsidian";
 import { detectAudioRecorderCommandIds } from "./command-utils";
 import { MAX_DURATION_MINUTES, TICK_INTERVAL_MS } from "./constants";
 import { createDefaultData, normalizeData } from "./data";
+import { TIMER_RECORDER_RIBBON_ICON_ID, registerTimerRecorderIcons } from "./icons";
 import { RecordingControlModal } from "./modals/recording-control-modal";
 import { StartTimerModal } from "./modals/start-timer-modal";
 import { TimerRecorderSettingTab } from "./settings-tab";
@@ -17,7 +18,8 @@ export default class TimerRecorderPlugin extends Plugin {
   async onload(): Promise<void> {
     this.data = normalizeData(await this.loadData());
 
-    this.addRibbonIcon("mic", "Start recording with timer", () => {
+    registerTimerRecorderIcons();
+    this.addRibbonIcon(TIMER_RECORDER_RIBBON_ICON_ID, this.manifest.name, () => {
       this.openEntryModal();
     });
 

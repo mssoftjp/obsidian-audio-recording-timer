@@ -1,5 +1,5 @@
 import type TimerRecorderPlugin from "../main";
-import { App, ButtonComponent, Modal, Setting, TextComponent } from "obsidian";
+import { App, ButtonComponent, DropdownComponent, Modal, Setting } from "obsidian";
 import { DURATION_ADD_MINUTES_OPTIONS, MAX_DURATION_MINUTES } from "../constants";
 import {
   computeStopAtFromEndTime,
@@ -17,7 +17,8 @@ export class StartTimerModal extends Modal {
   private durationValueEl?: HTMLElement;
   private durationClockEl?: HTMLElement;
   private durationMaxEl?: HTMLElement;
-  private endTimeInput?: TextComponent;
+  private endTimeHours?: DropdownComponent;
+  private endTimeMinutes?: DropdownComponent;
   private durationAddButtons: ButtonComponent[] = [];
   private resetButton?: ButtonComponent;
   private startButton?: ButtonComponent;
@@ -70,21 +71,31 @@ export class StartTimerModal extends Modal {
       durationButtonsEl.appendChild(btn.buttonEl);
     });
 
-    const endTimeSetting = new Setting(this.contentEl).setName("End time:");
+    const endTimeSetting = new Setting(this.contentEl).setName("End time");
 
     endTimeSetting.settingEl.addClass("timer-recorder-end-time-setting");
 
-    endTimeSetting.addText((text) => {
-      this.endTimeInput = text;
-      text.inputEl.type = "time";
-      text.inputEl.step = "60";
-      text.inputEl.classList.add("timer-recorder-time-input");
-      text.setValue(toTimeInputValue(new Date(this.stopAtMs)));
-      text.onChange((value) => {
-        if (this.isSyncing) return;
-        this.updateFromEndTime(value);
-      });
-    });
+    const endTimeControlEl = endTimeSetting.controlEl.createDiv({ cls: "timer-recorder-end-time-control" });
+
+    this.endTimeHours = new DropdownComponent(endTimeControlEl);
+    this.endTimeHours.selectEl.addClass("timer-recorder-end-time-dropdown");
+    for (let hour = 0; hour < 24; hour++) {
+      const value = hour.toString().padStart(2, "0");
+      this.endTimeHours.addOption(value, value);
+    }
+
+    endTimeControlEl.createSpan({ cls: "timer-recorder-end-time-separator", text: ":" });
+
+    this.endTimeMinutes = new DropdownComponent(endTimeControlEl);
+    this.endTimeMinutes.selectEl.addClass("timer-recorder-end-time-dropdown");
+    for (let minute = 0; minute < 60; minute++) {
+      const value = minute.toString().padStart(2, "0");
+      this.endTimeMinutes.addOption(value, value);
+    }
+
+    this.syncEndTimeControls();
+    this.endTimeHours.onChange(() => this.handleEndTimeChange());
+    this.endTimeMinutes.onChange(() => this.handleEndTimeChange());
 
     this.updateDurationDisplay();
 
@@ -110,7 +121,7 @@ export class StartTimerModal extends Modal {
 
     this.isSyncing = true;
     try {
-      this.endTimeInput?.setValue(toTimeInputValue(new Date(this.stopAtMs)));
+      this.syncEndTimeControls();
     } finally {
       this.isSyncing = false;
     }
@@ -134,7 +145,7 @@ export class StartTimerModal extends Modal {
 
     this.isSyncing = true;
     try {
-      this.endTimeInput?.setValue(toTimeInputValue(new Date(this.stopAtMs)));
+      this.syncEndTimeControls();
     } finally {
       this.isSyncing = false;
     }
@@ -168,7 +179,7 @@ export class StartTimerModal extends Modal {
 
     this.isSyncing = true;
     try {
-      this.endTimeInput?.setValue(toTimeInputValue(new Date(this.stopAtMs)));
+      this.syncEndTimeControls();
     } finally {
       this.isSyncing = false;
     }
@@ -179,6 +190,21 @@ export class StartTimerModal extends Modal {
 
   private updateStartButtonState(): void {
     this.startButton?.setDisabled(this.durationMinutes <= 0);
+  }
+
+  private handleEndTimeChange(): void {
+    if (this.isSyncing) return;
+    const hours = this.endTimeHours?.getValue();
+    const minutes = this.endTimeMinutes?.getValue();
+    if (!hours || !minutes) return;
+    this.updateFromEndTime(`${hours}:${minutes}`);
+  }
+
+  private syncEndTimeControls(): void {
+    const [hours, minutes] = toTimeInputValue(new Date(this.stopAtMs)).split(":");
+    if (!hours || !minutes) return;
+    this.endTimeHours?.setValue(hours);
+    this.endTimeMinutes?.setValue(minutes);
   }
 
   private async handleStart(): Promise<void> {

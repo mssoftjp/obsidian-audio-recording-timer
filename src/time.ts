@@ -46,12 +46,8 @@ export function isDifferentLocalDay(a: Date, b: Date): boolean {
 }
 
 export function formatStatusBarText(stopAtMs: number, nowMs: number): string {
-  const now = new Date(nowMs);
-  const stopAt = new Date(stopAtMs);
   const remaining = formatRemainingMs(stopAtMs - nowMs);
-  const end = formatClockTime(stopAt);
-  const daySuffix = isDifferentLocalDay(now, stopAt) ? " (+1d)" : "";
-  return `Rec: ${remaining} \u2192 ${end}${daySuffix}`;
+  return `Rec: ${remaining}`;
 }
 
 export function parseTimeInput(value: string): { hours: number; minutes: number } | null {
