@@ -12,6 +12,7 @@ export class StartTimerModal extends Modal {
   private readonly plugin: TimerRecorderPlugin;
   private durationMinutes: number;
   private stopAtMs: number;
+  private stopAtMode: "duration" | "endTime" = "duration";
   private isSyncing = false;
   private durationTotalEl?: HTMLElement;
   private durationValueEl?: HTMLElement;
@@ -115,6 +116,7 @@ export class StartTimerModal extends Modal {
   }
 
   private addDurationMinutes(minutesToAdd: number): void {
+    this.stopAtMode = "duration";
     const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, this.durationMinutes + minutesToAdd));
     this.durationMinutes = minutes;
     this.stopAtMs = Date.now() + minutesToMs(minutes);
@@ -131,6 +133,7 @@ export class StartTimerModal extends Modal {
   }
 
   private updateFromEndTime(value: string): void {
+    this.stopAtMode = "endTime";
     const now = new Date();
     const candidate = computeStopAtFromEndTime(now, value);
     if (!candidate) return;
@@ -174,6 +177,7 @@ export class StartTimerModal extends Modal {
   }
 
   private resetDuration(): void {
+    this.stopAtMode = "duration";
     this.durationMinutes = 0;
     this.stopAtMs = Date.now();
 
@@ -209,7 +213,19 @@ export class StartTimerModal extends Modal {
 
   private async handleStart(): Promise<void> {
     if (this.durationMinutes <= 0) return;
-    const ok = await this.plugin.startSessionWithTimer(this.stopAtMs, this.durationMinutes);
+    let stopAtMs = this.stopAtMs;
+    if (this.stopAtMode === "duration") {
+      stopAtMs = Date.now() + minutesToMs(this.durationMinutes);
+      this.stopAtMs = stopAtMs;
+      this.isSyncing = true;
+      try {
+        this.syncEndTimeControls();
+      } finally {
+        this.isSyncing = false;
+      }
+    }
+
+    const ok = await this.plugin.startSessionWithTimer(stopAtMs, this.durationMinutes);
     if (ok) this.close();
   }
 }
