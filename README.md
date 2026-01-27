@@ -5,7 +5,7 @@ Start Obsidian’s core audio recording with a countdown duration or an end time
 ## Usage
 
 - Click the plugin’s microphone icon in the left ribbon.
-- Choose a duration (time picker) or an end time (time picker).
+- Choose a duration (quick add buttons) or an end time (time picker).
 - Click **Start**.
 
 While recording:

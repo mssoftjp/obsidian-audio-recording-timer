@@ -1,15 +1,10 @@
 import type TimerRecorderPlugin from "../main";
-import { App, Modal, Setting, TextComponent } from "obsidian";
-import { MAX_DURATION_MINUTES } from "../constants";
+import { App, ButtonComponent, Modal, Setting, TextComponent } from "obsidian";
+import { DURATION_ADD_MINUTES_OPTIONS, MAX_DURATION_MINUTES } from "../constants";
 import {
-  clampMinutes,
   computeStopAtFromEndTime,
-  formatClockTime,
-  formatRemainingMs,
-  isDifferentLocalDay,
   minutesToMs,
   minutesToDurationInputValue,
-  parseTimeInput,
   toTimeInputValue,
 } from "../time";
 
@@ -18,45 +13,72 @@ export class StartTimerModal extends Modal {
   private durationMinutes: number;
   private stopAtMs: number;
   private isSyncing = false;
-  private summaryEl?: HTMLElement;
+  private durationTotalEl?: HTMLElement;
+  private durationValueEl?: HTMLElement;
+  private durationClockEl?: HTMLElement;
+  private durationMaxEl?: HTMLElement;
   private endTimeInput?: TextComponent;
-  private durationInput?: TextComponent;
+  private durationAddButtons: ButtonComponent[] = [];
+  private resetButton?: ButtonComponent;
+  private startButton?: ButtonComponent;
 
   constructor(app: App, plugin: TimerRecorderPlugin) {
     super(app);
     this.plugin = plugin;
-    this.durationMinutes = clampMinutes(this.plugin.getLastDurationMinutes());
-    this.stopAtMs = Date.now() + minutesToMs(this.durationMinutes);
+    this.durationMinutes = 0;
+    this.stopAtMs = Date.now();
   }
 
   onOpen(): void {
     this.setTitle("Start recording with timer");
+    this.contentEl.addClass("timer-recorder-start-modal");
 
     const durationSetting = new Setting(this.contentEl)
       .setName("Duration")
-      .setDesc("Set how long to record (up to 6 hours).");
+      .setDesc("Add minutes (up to 6 hours).");
 
-    durationSetting.addText((text) => {
-      this.durationInput = text;
-      text.inputEl.type = "time";
-      text.inputEl.step = "60";
-      text.inputEl.min = "00:01";
-      text.inputEl.max = "06:00";
-      text.setValue(minutesToDurationInputValue(this.durationMinutes));
-      text.onChange((value) => {
-        if (this.isSyncing) return;
-        this.updateFromDuration(value);
+    durationSetting.settingEl.addClass("timer-recorder-duration-setting");
+
+    const durationControlEl = durationSetting.controlEl.createDiv({
+      cls: "timer-recorder-duration-control",
+    });
+    const durationButtonsEl = durationControlEl.createDiv({ cls: "timer-recorder-duration-buttons" });
+    this.durationTotalEl = durationControlEl.createDiv({ cls: "timer-recorder-duration-total" });
+    this.durationTotalEl.createSpan({
+      cls: "timer-recorder-duration-label",
+      text: "Recording duration:",
+    });
+    this.durationValueEl = this.durationTotalEl.createSpan({ cls: "timer-recorder-duration-value" });
+    this.durationClockEl = this.durationTotalEl.createSpan({ cls: "timer-recorder-duration-clock" });
+    this.durationMaxEl = durationControlEl.createDiv({ cls: "timer-recorder-duration-max" });
+
+    for (const minutes of DURATION_ADD_MINUTES_OPTIONS) {
+      durationSetting.addButton((btn) => {
+        btn.setButtonText(`+${minutes} min`).onClick(() => {
+          this.addDurationMinutes(minutes);
+        });
+        durationButtonsEl.appendChild(btn.buttonEl);
+        this.durationAddButtons.push(btn);
       });
+    }
+
+    durationSetting.addButton((btn) => {
+      this.resetButton = btn;
+      btn.setButtonText("Reset").onClick(() => {
+        this.resetDuration();
+      });
+      durationButtonsEl.appendChild(btn.buttonEl);
     });
 
-    const endTimeSetting = new Setting(this.contentEl)
-      .setName("End time")
-      .setDesc("Set when recording should stop.");
+    const endTimeSetting = new Setting(this.contentEl).setName("End time:");
+
+    endTimeSetting.settingEl.addClass("timer-recorder-end-time-setting");
 
     endTimeSetting.addText((text) => {
       this.endTimeInput = text;
       text.inputEl.type = "time";
       text.inputEl.step = "60";
+      text.inputEl.classList.add("timer-recorder-time-input");
       text.setValue(toTimeInputValue(new Date(this.stopAtMs)));
       text.onChange((value) => {
         if (this.isSyncing) return;
@@ -64,17 +86,15 @@ export class StartTimerModal extends Modal {
       });
     });
 
-    this.summaryEl = this.contentEl.createEl("div");
-    this.updateSummary();
+    this.updateDurationDisplay();
 
     new Setting(this.contentEl)
       .addButton((btn) =>
-        btn
+        (this.startButton = btn)
           .setButtonText("Start")
           .setCta()
-          .onClick(() => {
-            void this.handleStart();
-          }),
+          .setDisabled(this.durationMinutes <= 0)
+          .onClick(() => void this.handleStart()),
       )
       .addButton((btn) => btn.setButtonText("Cancel").onClick(() => this.close()));
   }
@@ -83,22 +103,20 @@ export class StartTimerModal extends Modal {
     this.contentEl.empty();
   }
 
-  private updateFromDuration(value: string): void {
-    const parsed = parseTimeInput(value);
-    if (!parsed) return;
-    const minutes = clampMinutes(parsed.hours * 60 + parsed.minutes);
+  private addDurationMinutes(minutesToAdd: number): void {
+    const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, this.durationMinutes + minutesToAdd));
     this.durationMinutes = minutes;
     this.stopAtMs = Date.now() + minutesToMs(minutes);
 
     this.isSyncing = true;
     try {
-      this.durationInput?.setValue(minutesToDurationInputValue(minutes));
       this.endTimeInput?.setValue(toTimeInputValue(new Date(this.stopAtMs)));
     } finally {
       this.isSyncing = false;
     }
 
-    this.updateSummary();
+    this.updateDurationDisplay();
+    this.updateStartButtonState();
   }
 
   private updateFromEndTime(value: string): void {
@@ -109,35 +127,62 @@ export class StartTimerModal extends Modal {
     const nowMs = now.getTime();
     const candidateMs = candidate.getTime();
     const diffMinutes = Math.ceil((candidateMs - nowMs) / 60_000);
-    const minutes = clampMinutes(diffMinutes);
+    const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, Math.round(diffMinutes)));
 
     this.durationMinutes = minutes;
     this.stopAtMs = diffMinutes > MAX_DURATION_MINUTES ? nowMs + minutesToMs(minutes) : candidateMs;
 
     this.isSyncing = true;
     try {
-      this.durationInput?.setValue(minutesToDurationInputValue(minutes));
       this.endTimeInput?.setValue(toTimeInputValue(new Date(this.stopAtMs)));
     } finally {
       this.isSyncing = false;
     }
 
-    this.updateSummary();
+    this.updateDurationDisplay();
+    this.updateStartButtonState();
   }
 
-  private updateSummary(): void {
-    if (!this.summaryEl) return;
+  private updateDurationDisplay(): void {
+    if (this.durationValueEl && this.durationClockEl) {
+      const formatted = minutesToDurationInputValue(this.durationMinutes);
+      this.durationValueEl.setText(`${this.durationMinutes} min`);
+      this.durationClockEl.setText(`(${formatted})`);
+    }
 
-    const now = new Date();
-    const stopAt = new Date(this.stopAtMs);
-    const remaining = formatRemainingMs(this.stopAtMs - now.getTime());
-    const daySuffix = isDifferentLocalDay(now, stopAt) ? " (+1d)" : "";
-    this.summaryEl.setText(
-      `Duration: ${this.durationMinutes} min — Ends at: ${formatClockTime(stopAt)}${daySuffix} — Remaining: ${remaining}`,
-    );
+    const atMax = this.durationMinutes >= MAX_DURATION_MINUTES;
+    if (this.durationMaxEl) {
+      this.durationMaxEl.setText(atMax ? "Maximum duration is 6 hours." : "");
+    }
+
+    for (const btn of this.durationAddButtons) {
+      btn.setDisabled(atMax);
+    }
+
+    this.resetButton?.setDisabled(this.durationMinutes === 0);
+  }
+
+  private resetDuration(): void {
+    this.durationMinutes = 0;
+    this.stopAtMs = Date.now();
+
+    this.isSyncing = true;
+    try {
+      this.endTimeInput?.setValue(toTimeInputValue(new Date(this.stopAtMs)));
+    } finally {
+      this.isSyncing = false;
+    }
+
+    this.updateDurationDisplay();
+    this.updateStartButtonState();
+  }
+
+  private updateStartButtonState(): void {
+    this.startButton?.setDisabled(this.durationMinutes <= 0);
   }
 
   private async handleStart(): Promise<void> {
+    if (this.durationMinutes <= 0) return;
     const ok = await this.plugin.startSessionWithTimer(this.stopAtMs, this.durationMinutes);
     if (ok) this.close();
   }
