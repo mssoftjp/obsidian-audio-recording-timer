@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "node esbuild.config.mjs --watch",
     "prebuild": "npm run lint && npm run typecheck",
-    "build": "node esbuild.config.mjs production",
+    "build:dist": "node esbuild.config.mjs production",
+    "build": "npm run build:dist && node scripts/export-build.mjs release",
+    "build:debug": "node esbuild.config.mjs && node scripts/export-build.mjs debug",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p tsconfig.json --noEmit",

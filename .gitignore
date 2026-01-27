@@ -1,7 +1,14 @@
 .DS_Store
 node_modules/
 dist/
-build/
+build/*
+!build/.gitkeep
+!build/debug/
+!build/release/
+build/debug/*
+!build/debug/.gitkeep
+build/release/*
+!build/release/.gitkeep
 /release/
 /releases/
 /main.js

@@ -13,6 +13,8 @@ While recording:
 - Click the plugin’s microphone icon again to **stop now** or **extend**.
 - Remaining time is shown in the status bar (desktop).
 
+![Start recording with timer modal](docs/screenshots/start-recording-with-timer.png)
+
 ## Requirements
 
 - Obsidian core plugin **Audio recorder** must be enabled.
