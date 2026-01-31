@@ -15,3 +15,4 @@ build/release/*
 .env
 .env.local
 AGENTS.md
+/spec/

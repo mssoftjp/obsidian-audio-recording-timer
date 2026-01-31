@@ -4,13 +4,13 @@ Start Obsidian’s core audio recording with a countdown duration or an end time
 
 ## Usage
 
-- Click the plugin’s microphone icon in the left ribbon.
+- Click the plugin’s timer icon in the left ribbon.
 - Choose a duration (quick add buttons) or an end time (dropdowns).
 - Click **Start**.
 
 While recording:
 
-- Click the plugin’s microphone icon again to **stop now** or **extend**.
+- Click the plugin’s timer icon again to **stop now** or **extend**.
 - Remaining time is shown in the status bar (desktop).
 
 ![Start recording with timer modal](docs/screenshots/start-recording-with-timer.png)
@@ -44,3 +44,8 @@ This repo can auto-deploy the built files into your vault’s plugins folder aft
 
 1. Copy `.env.example` to `.env` and set `OBSIDIAN_PLUGINS_DIR`.
 2. Run `npm run dev` (watch) or `npm run build` (production).
+
+## License
+
+- Source code: MIT (see `LICENSE`).
+- Third-party assets: see `THIRD_PARTY_LICENSES.md`.

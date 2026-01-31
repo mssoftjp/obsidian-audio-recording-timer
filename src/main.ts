@@ -1,16 +1,19 @@
-import type { ActiveSession, TimerRecorderData } from "./data";
+import type { ActiveSession, AudioRecordingTimerData } from "./data";
 import { Notice, Platform, Plugin } from "obsidian";
 import { detectAudioRecorderCommandIds } from "./command-utils";
 import { MAX_DURATION_MINUTES, TICK_INTERVAL_MS } from "./constants";
 import { createDefaultData, normalizeData } from "./data";
-import { TIMER_RECORDER_RIBBON_ICON_ID, registerTimerRecorderIcons } from "./icons";
+import {
+  AUDIO_RECORDING_TIMER_RIBBON_ICON_ID,
+  registerAudioRecordingTimerIcons,
+} from "./icons";
 import { RecordingControlModal } from "./modals/recording-control-modal";
 import { StartTimerModal } from "./modals/start-timer-modal";
-import { TimerRecorderSettingTab } from "./settings-tab";
+import { AudioRecordingTimerSettingTab } from "./settings-tab";
 import { formatStatusBarText, minutesToMs } from "./time";
 
-export default class TimerRecorderPlugin extends Plugin {
-  private data: TimerRecorderData = createDefaultData();
+export default class AudioRecordingTimerPlugin extends Plugin {
+  private data: AudioRecordingTimerData = createDefaultData();
   private statusBarEl?: HTMLElement;
   private tickIntervalId?: number;
   private isStopping = false;
@@ -18,8 +21,8 @@ export default class TimerRecorderPlugin extends Plugin {
   async onload(): Promise<void> {
     this.data = normalizeData(await this.loadData());
 
-    registerTimerRecorderIcons();
-    this.addRibbonIcon(TIMER_RECORDER_RIBBON_ICON_ID, this.manifest.name, () => {
+    registerAudioRecordingTimerIcons();
+    this.addRibbonIcon(AUDIO_RECORDING_TIMER_RIBBON_ICON_ID, this.manifest.name, () => {
       this.openEntryModal();
     });
 
@@ -35,7 +38,7 @@ export default class TimerRecorderPlugin extends Plugin {
       callback: () => this.openEntryModal(),
     });
 
-    this.addSettingTab(new TimerRecorderSettingTab(this.app, this));
+    this.addSettingTab(new AudioRecordingTimerSettingTab(this.app, this));
 
     if (!Platform.isMobile) {
       this.statusBarEl = this.addStatusBarItem();

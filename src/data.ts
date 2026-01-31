@@ -5,7 +5,7 @@ export interface ActiveSession {
   stopAtMs: number;
 }
 
-export interface TimerRecorderData {
+export interface AudioRecordingTimerData {
   version: 1;
   startCommandId?: string;
   stopCommandId?: string;
@@ -15,7 +15,7 @@ export interface TimerRecorderData {
 
 export const DEFAULT_LAST_DURATION_MINUTES = 25;
 
-export function createDefaultData(): TimerRecorderData {
+export function createDefaultData(): AudioRecordingTimerData {
   return {
     version: 1,
     startCommandId: "audio-recorder:start",
@@ -55,7 +55,7 @@ function normalizeActiveSession(value: unknown): ActiveSession | undefined {
   return { startedAtMs, stopAtMs };
 }
 
-export function normalizeData(raw: unknown): TimerRecorderData {
+export function normalizeData(raw: unknown): AudioRecordingTimerData {
   const defaults = createDefaultData();
   if (!isRecord(raw)) return defaults;
 

@@ -1,4 +1,4 @@
-import type TimerRecorderPlugin from "../main";
+import type AudioRecordingTimerPlugin from "../main";
 import { App, ButtonComponent, DropdownComponent, Modal, Setting } from "obsidian";
 import { DURATION_ADD_MINUTES_OPTIONS, MAX_DURATION_MINUTES } from "../constants";
 import {
@@ -9,7 +9,7 @@ import {
 } from "../time";
 
 export class StartTimerModal extends Modal {
-  private readonly plugin: TimerRecorderPlugin;
+  private readonly plugin: AudioRecordingTimerPlugin;
   private durationMinutes: number;
   private stopAtMs: number;
   private stopAtMode: "duration" | "endTime" = "duration";
@@ -24,7 +24,7 @@ export class StartTimerModal extends Modal {
   private resetButton?: ButtonComponent;
   private startButton?: ButtonComponent;
 
-  constructor(app: App, plugin: TimerRecorderPlugin) {
+  constructor(app: App, plugin: AudioRecordingTimerPlugin) {
     super(app);
     this.plugin = plugin;
     this.durationMinutes = 0;
@@ -33,26 +33,36 @@ export class StartTimerModal extends Modal {
 
   onOpen(): void {
     this.setTitle("Start recording with timer");
-    this.contentEl.addClass("timer-recorder-start-modal");
+    this.contentEl.addClass("audio-recording-timer-start-modal");
 
     const durationSetting = new Setting(this.contentEl)
       .setName("Duration")
       .setDesc("Add minutes (up to 6 hours).");
 
-    durationSetting.settingEl.addClass("timer-recorder-duration-setting");
+    durationSetting.settingEl.addClass("audio-recording-timer-duration-setting");
 
     const durationControlEl = durationSetting.controlEl.createDiv({
-      cls: "timer-recorder-duration-control",
+      cls: "audio-recording-timer-duration-control",
     });
-    const durationButtonsEl = durationControlEl.createDiv({ cls: "timer-recorder-duration-buttons" });
-    this.durationTotalEl = durationControlEl.createDiv({ cls: "timer-recorder-duration-total" });
+    const durationButtonsEl = durationControlEl.createDiv({
+      cls: "audio-recording-timer-duration-buttons",
+    });
+    this.durationTotalEl = durationControlEl.createDiv({
+      cls: "audio-recording-timer-duration-total",
+    });
     this.durationTotalEl.createSpan({
-      cls: "timer-recorder-duration-label",
+      cls: "audio-recording-timer-duration-label",
       text: "Recording duration:",
     });
-    this.durationValueEl = this.durationTotalEl.createSpan({ cls: "timer-recorder-duration-value" });
-    this.durationClockEl = this.durationTotalEl.createSpan({ cls: "timer-recorder-duration-clock" });
-    this.durationMaxEl = durationControlEl.createDiv({ cls: "timer-recorder-duration-max" });
+    this.durationValueEl = this.durationTotalEl.createSpan({
+      cls: "audio-recording-timer-duration-value",
+    });
+    this.durationClockEl = this.durationTotalEl.createSpan({
+      cls: "audio-recording-timer-duration-clock",
+    });
+    this.durationMaxEl = durationControlEl.createDiv({
+      cls: "audio-recording-timer-duration-max",
+    });
 
     for (const minutes of DURATION_ADD_MINUTES_OPTIONS) {
       durationSetting.addButton((btn) => {
@@ -74,21 +84,23 @@ export class StartTimerModal extends Modal {
 
     const endTimeSetting = new Setting(this.contentEl).setName("End time");
 
-    endTimeSetting.settingEl.addClass("timer-recorder-end-time-setting");
+    endTimeSetting.settingEl.addClass("audio-recording-timer-end-time-setting");
 
-    const endTimeControlEl = endTimeSetting.controlEl.createDiv({ cls: "timer-recorder-end-time-control" });
+    const endTimeControlEl = endTimeSetting.controlEl.createDiv({
+      cls: "audio-recording-timer-end-time-control",
+    });
 
     this.endTimeHours = new DropdownComponent(endTimeControlEl);
-    this.endTimeHours.selectEl.addClass("timer-recorder-end-time-dropdown");
+    this.endTimeHours.selectEl.addClass("audio-recording-timer-end-time-dropdown");
     for (let hour = 0; hour < 24; hour++) {
       const value = hour.toString().padStart(2, "0");
       this.endTimeHours.addOption(value, value);
     }
 
-    endTimeControlEl.createSpan({ cls: "timer-recorder-end-time-separator", text: ":" });
+    endTimeControlEl.createSpan({ cls: "audio-recording-timer-end-time-separator", text: ":" });
 
     this.endTimeMinutes = new DropdownComponent(endTimeControlEl);
-    this.endTimeMinutes.selectEl.addClass("timer-recorder-end-time-dropdown");
+    this.endTimeMinutes.selectEl.addClass("audio-recording-timer-end-time-dropdown");
     for (let minute = 0; minute < 60; minute++) {
       const value = minute.toString().padStart(2, "0");
       this.endTimeMinutes.addOption(value, value);

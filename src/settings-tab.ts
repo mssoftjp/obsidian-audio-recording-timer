@@ -1,12 +1,12 @@
-import type TimerRecorderPlugin from "./main";
+import type AudioRecordingTimerPlugin from "./main";
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { detectAudioRecorderCommandIds } from "./command-utils";
 import { CommandPickerModal } from "./modals/command-picker-modal";
 
-export class TimerRecorderSettingTab extends PluginSettingTab {
-  private readonly plugin: TimerRecorderPlugin;
+export class AudioRecordingTimerSettingTab extends PluginSettingTab {
+  private readonly plugin: AudioRecordingTimerPlugin;
 
-  constructor(app: App, plugin: TimerRecorderPlugin) {
+  constructor(app: App, plugin: AudioRecordingTimerPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }

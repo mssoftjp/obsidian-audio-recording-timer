@@ -1,17 +1,17 @@
-import type TimerRecorderPlugin from "../main";
+import type AudioRecordingTimerPlugin from "../main";
 import { App, ButtonComponent, Modal, Notice, Setting } from "obsidian";
 import { EXTEND_MINUTES_OPTIONS, MAX_DURATION_MINUTES, TICK_INTERVAL_MS } from "../constants";
 import { formatClockTime, formatRemainingMs, isDifferentLocalDay } from "../time";
 
 export class RecordingControlModal extends Modal {
-  private readonly plugin: TimerRecorderPlugin;
+  private readonly plugin: AudioRecordingTimerPlugin;
   private remainingEl?: HTMLElement;
   private endsAtEl?: HTMLElement;
   private maxEl?: HTMLElement;
   private intervalId?: number;
   private extendButtons: ButtonComponent[] = [];
 
-  constructor(app: App, plugin: TimerRecorderPlugin) {
+  constructor(app: App, plugin: AudioRecordingTimerPlugin) {
     super(app);
     this.plugin = plugin;
   }
