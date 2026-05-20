@@ -1,7 +1,12 @@
 import type AudioRecordingTimerPlugin from "./main";
 import { App, PluginSettingTab, Setting } from "obsidian";
-import { detectAudioRecorderCommandIds } from "./command-utils";
+import {
+  detectAudioRecorderCommandIds,
+  filterAudioRecorderStartCommands,
+  filterAudioRecorderStopCommands,
+} from "./command-utils";
 import { CommandPickerModal } from "./modals/command-picker-modal";
+import { listObsidianCommands } from "./obsidian-commands";
 
 export class AudioRecordingTimerSettingTab extends PluginSettingTab {
   private readonly plugin: AudioRecordingTimerPlugin;
@@ -15,7 +20,9 @@ export class AudioRecordingTimerSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    const commands = this.app.commands.listCommands();
+    const commands = listObsidianCommands(this.app);
+    const startCommands = filterAudioRecorderStartCommands(commands);
+    const stopCommands = filterAudioRecorderStopCommands(commands);
 
     new Setting(containerEl)
       .setName("Start command")
@@ -28,7 +35,7 @@ export class AudioRecordingTimerSettingTab extends PluginSettingTab {
       })
       .addButton((btn) =>
         btn.setButtonText("Pick").onClick(() => {
-          new CommandPickerModal(this.app, commands, (command) => {
+          new CommandPickerModal(this.app, startCommands, (command) => {
             void this.plugin.setStartCommandId(command.id);
             this.display();
           }).open();
@@ -46,7 +53,7 @@ export class AudioRecordingTimerSettingTab extends PluginSettingTab {
       })
       .addButton((btn) =>
         btn.setButtonText("Pick").onClick(() => {
-          new CommandPickerModal(this.app, commands, (command) => {
+          new CommandPickerModal(this.app, stopCommands, (command) => {
             void this.plugin.setStopCommandId(command.id);
             this.display();
           }).open();

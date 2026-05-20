@@ -12,6 +12,26 @@ const STOP_IDS = [
   "audio-recorder:stop-record",
 ];
 
+function isAudioRecorderCommandId(commandId: string): boolean {
+  return commandId.startsWith("audio-recorder:");
+}
+
+export function isAudioRecorderStartCommandId(commandId: string): boolean {
+  return isAudioRecorderCommandId(commandId) && /\bstart\b/i.test(commandId);
+}
+
+export function isAudioRecorderStopCommandId(commandId: string): boolean {
+  return isAudioRecorderCommandId(commandId) && /\bstop\b/i.test(commandId);
+}
+
+export function filterAudioRecorderStartCommands(commands: Command[]): Command[] {
+  return commands.filter((command) => isAudioRecorderStartCommandId(command.id));
+}
+
+export function filterAudioRecorderStopCommands(commands: Command[]): Command[] {
+  return commands.filter((command) => isAudioRecorderStopCommandId(command.id));
+}
+
 function findFirstExisting(commands: Command[], ids: string[]): string | undefined {
   const idSet = new Set(commands.map((c) => c.id));
   return ids.find((id) => idSet.has(id));
@@ -45,4 +65,3 @@ export function detectAudioRecorderCommandIds(commands: Command[]): {
 export function formatCommandChoice(command: Command): string {
   return `${command.name} (${command.id})`;
 }
-

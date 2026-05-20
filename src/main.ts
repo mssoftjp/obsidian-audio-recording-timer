@@ -2,13 +2,22 @@ import type { ActiveSession, AudioRecordingTimerData } from "./data";
 import { Notice, Platform, Plugin } from "obsidian";
 import { detectAudioRecorderCommandIds } from "./command-utils";
 import { MAX_DURATION_MINUTES, TICK_INTERVAL_MS } from "./constants";
-import { createDefaultData, normalizeData } from "./data";
+import {
+  createDefaultData,
+  normalizeData,
+  normalizeStartCommandId,
+  normalizeStopCommandId,
+} from "./data";
 import {
   AUDIO_RECORDING_TIMER_RIBBON_ICON_ID,
   registerAudioRecordingTimerIcons,
 } from "./icons";
 import { RecordingControlModal } from "./modals/recording-control-modal";
 import { StartTimerModal } from "./modals/start-timer-modal";
+import {
+  executeObsidianCommandById,
+  listObsidianCommands,
+} from "./obsidian-commands";
 import { AudioRecordingTimerSettingTab } from "./settings-tab";
 import { formatStatusBarText, minutesToMs } from "./time";
 
@@ -49,8 +58,8 @@ export default class AudioRecordingTimerPlugin extends Plugin {
     this.registerDomEvent(window, "focus", () => {
       void this.checkTimeUp();
     });
-    this.registerDomEvent(document, "visibilitychange", () => {
-      if (document.visibilityState === "visible") {
+    this.registerDomEvent(activeDocument, "visibilitychange", () => {
+      if (activeDocument.visibilityState === "visible") {
         void this.checkTimeUp();
       }
     });
@@ -73,12 +82,24 @@ export default class AudioRecordingTimerPlugin extends Plugin {
   }
 
   async setStartCommandId(value: string): Promise<void> {
-    this.data.startCommandId = value.length > 0 ? value : undefined;
+    const commandId = normalizeStartCommandId(value);
+    if (value.length > 0 && commandId === undefined) {
+      new Notice("Choose an audio recorder start command.");
+      return;
+    }
+
+    this.data.startCommandId = commandId;
     await this.saveData(this.data);
   }
 
   async setStopCommandId(value: string): Promise<void> {
-    this.data.stopCommandId = value.length > 0 ? value : undefined;
+    const commandId = normalizeStopCommandId(value);
+    if (value.length > 0 && commandId === undefined) {
+      new Notice("Choose an audio recorder stop command.");
+      return;
+    }
+
+    this.data.stopCommandId = commandId;
     await this.saveData(this.data);
   }
 
@@ -110,7 +131,10 @@ export default class AudioRecordingTimerPlugin extends Plugin {
     }
 
     try {
-      this.app.commands.executeCommandById(this.data.startCommandId);
+      if (!executeObsidianCommandById(this.app, this.data.startCommandId)) {
+        new Notice("Failed to start recording.");
+        return false;
+      }
     } catch {
       new Notice("Failed to start recording.");
       return false;
@@ -157,7 +181,11 @@ export default class AudioRecordingTimerPlugin extends Plugin {
 
     this.isStopping = true;
     try {
-      this.app.commands.executeCommandById(this.data.stopCommandId);
+      if (!executeObsidianCommandById(this.app, this.data.stopCommandId)) {
+        new Notice("Failed to stop recording.");
+        return;
+      }
+
       this.data.activeSession = undefined;
       await this.saveData(this.data);
       this.stopTicking();
@@ -172,9 +200,11 @@ export default class AudioRecordingTimerPlugin extends Plugin {
 
   private startTicking(): void {
     if (this.tickIntervalId !== undefined) return;
-    this.tickIntervalId = window.setInterval(() => {
-      void this.checkTimeUp();
-    }, TICK_INTERVAL_MS);
+    this.tickIntervalId = this.registerInterval(
+      window.setInterval(() => {
+        void this.checkTimeUp();
+      }, TICK_INTERVAL_MS),
+    );
   }
 
   private stopTicking(): void {
@@ -212,7 +242,7 @@ export default class AudioRecordingTimerPlugin extends Plugin {
 
   private async autoDetectCommandsIfNeeded(): Promise<void> {
     if (this.data.startCommandId && this.data.stopCommandId) return;
-    const detected = detectAudioRecorderCommandIds(this.app.commands.listCommands());
+    const detected = detectAudioRecorderCommandIds(listObsidianCommands(this.app));
     const changed =
       (this.data.startCommandId === undefined && detected.startCommandId !== undefined) ||
       (this.data.stopCommandId === undefined && detected.stopCommandId !== undefined);

@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
@@ -28,9 +30,12 @@ jobs:
           cp dist/main.js release/main.js
           cp dist/manifest.json release/manifest.json
           if [ -f dist/styles.css ]; then cp dist/styles.css release/styles.css; fi
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/*
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: release/*
           generate_release_notes: true
-

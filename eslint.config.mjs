@@ -2,6 +2,10 @@ import tsparser from "@typescript-eslint/parser";
 import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
+const obsidianRulesOff = Object.fromEntries(
+  Object.keys(obsidianmd.rules).map((ruleName) => [`obsidianmd/${ruleName}`, "off"]),
+);
+
 export default defineConfig([
   {
     ignores: [
@@ -12,11 +16,14 @@ export default defineConfig([
       "release/**",
       "releases/**",
       "spec/**",
+      "package-lock.json",
+      "tsconfig.json",
     ],
   },
   ...obsidianmd.configs.recommended,
   {
-    files: ["**/*.mjs"],
+    files: ["**/*.mjs", "package.json", "package-lock.json", "tsconfig.json"],
+    rules: obsidianRulesOff,
     languageOptions: {
       globals: {
         console: "readonly",
@@ -31,7 +38,7 @@ export default defineConfig([
       parserOptions: { project: "./tsconfig.json" },
       globals: {
         window: "readonly",
-        document: "readonly",
+        activeDocument: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
         setTimeout: "readonly",

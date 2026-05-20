@@ -1,4 +1,8 @@
 import { MAX_DURATION_MINUTES } from "./constants";
+import {
+  isAudioRecorderStartCommandId,
+  isAudioRecorderStopCommandId,
+} from "./command-utils";
 
 export interface ActiveSession {
   startedAtMs: number;
@@ -55,14 +59,26 @@ function normalizeActiveSession(value: unknown): ActiveSession | undefined {
   return { startedAtMs, stopAtMs };
 }
 
+export function normalizeStartCommandId(value: unknown): string | undefined {
+  const commandId = toString(value);
+  return commandId && isAudioRecorderStartCommandId(commandId) ? commandId : undefined;
+}
+
+export function normalizeStopCommandId(value: unknown): string | undefined {
+  const commandId = toString(value);
+  return commandId && isAudioRecorderStopCommandId(commandId) ? commandId : undefined;
+}
+
 export function normalizeData(raw: unknown): AudioRecordingTimerData {
   const defaults = createDefaultData();
   if (!isRecord(raw)) return defaults;
 
   return {
     version: 1,
-    startCommandId: toString(raw.startCommandId) ?? defaults.startCommandId,
-    stopCommandId: toString(raw.stopCommandId) ?? defaults.stopCommandId,
+    startCommandId:
+      normalizeStartCommandId(raw.startCommandId) ?? defaults.startCommandId,
+    stopCommandId:
+      normalizeStopCommandId(raw.stopCommandId) ?? defaults.stopCommandId,
     lastDurationMinutes:
       normalizeLastDurationMinutes(raw.lastDurationMinutes) ??
       defaults.lastDurationMinutes,

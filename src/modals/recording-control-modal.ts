@@ -26,9 +26,9 @@ export class RecordingControlModal extends Modal {
       return;
     }
 
-    this.remainingEl = this.contentEl.createEl("div");
-    this.endsAtEl = this.contentEl.createEl("div");
-    this.maxEl = this.contentEl.createEl("div");
+    this.remainingEl = this.contentEl.createDiv();
+    this.endsAtEl = this.contentEl.createDiv();
+    this.maxEl = this.contentEl.createDiv();
 
     new Setting(this.contentEl).addButton((btn) =>
       btn.setButtonText("Stop now").onClick(() => {
