@@ -5,6 +5,11 @@ import {
   filterAudioRecorderStartCommands,
   filterAudioRecorderStopCommands,
 } from "./command-utils";
+import {
+  MAX_QUICK_END_TIME_RANGE_MINUTES,
+  MIN_QUICK_END_TIME_RANGE_MINUTES,
+  QUICK_END_TIME_RANGE_STEP_MINUTES,
+} from "./constants";
 import { CommandPickerModal } from "./modals/command-picker-modal";
 import { listObsidianCommands } from "./obsidian-commands";
 
@@ -23,6 +28,28 @@ export class AudioRecordingTimerSettingTab extends PluginSettingTab {
     const commands = listObsidianCommands(this.app);
     const startCommands = filterAudioRecorderStartCommands(commands);
     const stopCommands = filterAudioRecorderStopCommands(commands);
+
+    new Setting(containerEl)
+      .setName("Quick end time range")
+      .setDesc("Show rounded end-time choices up to this approximate duration.")
+      .addDropdown((dropdown) => {
+        for (
+          let minutes = MIN_QUICK_END_TIME_RANGE_MINUTES;
+          minutes <= MAX_QUICK_END_TIME_RANGE_MINUTES;
+          minutes += QUICK_END_TIME_RANGE_STEP_MINUTES
+        ) {
+          dropdown.addOption(
+            minutes.toString(),
+            this.formatRangeMinutes(minutes),
+          );
+        }
+
+        dropdown
+          .setValue(this.plugin.getQuickEndTimeRangeMinutes().toString())
+          .onChange((value) => {
+            void this.saveQuickEndTimeRange(Number(value));
+          });
+      });
 
     new Setting(containerEl)
       .setName("Start command")
@@ -71,5 +98,17 @@ export class AudioRecordingTimerSettingTab extends PluginSettingTab {
           this.display();
         }),
       );
+  }
+
+  private formatRangeMinutes(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if (remainingMinutes === 0) return `${hours} hours`;
+    return `${hours} hours ${remainingMinutes} minutes`;
+  }
+
+  private async saveQuickEndTimeRange(value: number): Promise<void> {
+    await this.plugin.setQuickEndTimeRangeMinutes(value);
+    this.display();
   }
 }

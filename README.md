@@ -1,12 +1,16 @@
 # Audio Recording Timer
 
-Start Obsidian’s core audio recording with a countdown duration or an end time, and stop it automatically when time is up.
+Start Obsidian’s core audio recording with a rounded end time, and stop it automatically when time is up.
 
 ## Usage
 
 - Click the plugin’s timer icon in the left ribbon.
-- Choose a duration (quick add buttons) or an end time (dropdowns).
+- Choose a **Quick end time**.
+- Optionally use **Add time** to move the selected end time later.
+- Confirm or edit the final **End time**. Use **Reset** to clear the selection.
 - Click **Start**.
+
+Quick end-time choices start at the first 15-minute clock boundary at least 15 minutes from now and cover approximately two hours by default. In **Settings → Audio Recording Timer**, you can extend the range in 30-minute increments up to 5 hours 30 minutes.
 
 While recording:
 

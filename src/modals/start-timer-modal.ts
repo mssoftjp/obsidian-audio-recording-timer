@@ -1,23 +1,38 @@
 import type AudioRecordingTimerPlugin from "../main";
 import { App, ButtonComponent, DropdownComponent, Modal, Setting } from "obsidian";
-import { DURATION_ADD_MINUTES_OPTIONS, MAX_DURATION_MINUTES } from "../constants";
 import {
+  DURATION_ADD_MINUTES_OPTIONS,
+  TICK_INTERVAL_MS,
+} from "../constants";
+import {
+  computeMinuteAlignedMaxStopAt,
+  computeQuickEndTimes,
   computeStopAtFromEndTime,
-  minutesToMs,
+  formatClockTime,
+  isDifferentLocalDay,
   minutesToDurationInputValue,
+  minutesToMs,
+  remainingMinutesUntil,
   toTimeInputValue,
 } from "../time";
 
 export class StartTimerModal extends Modal {
   private readonly plugin: AudioRecordingTimerPlugin;
-  private durationMinutes: number;
-  private stopAtMs: number;
-  private stopAtMode: "duration" | "endTime" = "duration";
+  private durationMinutes = 0;
+  private stopAtMs?: number;
   private isSyncing = false;
-  private durationTotalEl?: HTMLElement;
+  private quickEndTimes: Date[] = [];
+  private quickEndTimeButtons: Array<{
+    stopAtMs: number;
+    button: ButtonComponent;
+  }> = [];
+  private tickIntervalId?: number;
+  private quickEndTimeButtonsEl?: HTMLElement;
+  private durationButtonsEl?: HTMLElement;
   private durationValueEl?: HTMLElement;
   private durationClockEl?: HTMLElement;
   private durationMaxEl?: HTMLElement;
+  private selectionMessageEl?: HTMLElement;
   private endTimeHours?: DropdownComponent;
   private endTimeMinutes?: DropdownComponent;
   private durationAddButtons: ButtonComponent[] = [];
@@ -27,217 +42,384 @@ export class StartTimerModal extends Modal {
   constructor(app: App, plugin: AudioRecordingTimerPlugin) {
     super(app);
     this.plugin = plugin;
-    this.durationMinutes = 0;
-    this.stopAtMs = Date.now();
   }
 
   onOpen(): void {
+    this.stopAtMs = undefined;
+    this.durationMinutes = 0;
+    this.quickEndTimes = [];
+    this.quickEndTimeButtons = [];
+    this.durationAddButtons = [];
+
     this.setTitle("Start recording with timer");
     this.contentEl.addClass("audio-recording-timer-start-modal");
 
-    const durationSetting = new Setting(this.contentEl)
-      .setName("Duration")
-      .setDesc("Add minutes (up to 6 hours).");
+    const quickEndTimeSetting = new Setting(this.contentEl)
+      .setName("Quick end time")
+      .setDesc("Choose a rounded clock time.");
+    quickEndTimeSetting.settingEl.addClass(
+      "audio-recording-timer-quick-end-time-setting",
+    );
+    this.quickEndTimeButtonsEl = quickEndTimeSetting.controlEl.createDiv({
+      cls: "audio-recording-timer-quick-end-time-buttons",
+    });
 
-    durationSetting.settingEl.addClass("audio-recording-timer-duration-setting");
+    const durationSetting = new Setting(this.contentEl)
+      .setName("Add time")
+      .setDesc("Move the selected end time later (up to 6 hours).");
+    durationSetting.settingEl.addClass(
+      "audio-recording-timer-duration-setting",
+    );
 
     const durationControlEl = durationSetting.controlEl.createDiv({
       cls: "audio-recording-timer-duration-control",
     });
-    const durationButtonsEl = durationControlEl.createDiv({
+    this.durationButtonsEl = durationControlEl.createDiv({
       cls: "audio-recording-timer-duration-buttons",
     });
-    this.durationTotalEl = durationControlEl.createDiv({
+
+    for (const minutes of DURATION_ADD_MINUTES_OPTIONS) {
+      const button = new ButtonComponent(this.durationButtonsEl)
+        .setButtonText(`+${minutes} min`)
+        .setDisabled(true)
+        .onClick(() => {
+          this.addDurationMinutes(minutes);
+        });
+      this.durationAddButtons.push(button);
+    }
+
+    const durationTotalEl = durationControlEl.createDiv({
       cls: "audio-recording-timer-duration-total",
     });
-    this.durationTotalEl.createSpan({
+    durationTotalEl.createSpan({
       cls: "audio-recording-timer-duration-label",
-      text: "Recording duration:",
+      text: "Time remaining:",
     });
-    this.durationValueEl = this.durationTotalEl.createSpan({
+    this.durationValueEl = durationTotalEl.createSpan({
       cls: "audio-recording-timer-duration-value",
     });
-    this.durationClockEl = this.durationTotalEl.createSpan({
+    this.durationClockEl = durationTotalEl.createSpan({
       cls: "audio-recording-timer-duration-clock",
     });
     this.durationMaxEl = durationControlEl.createDiv({
       cls: "audio-recording-timer-duration-max",
     });
 
-    for (const minutes of DURATION_ADD_MINUTES_OPTIONS) {
-      durationSetting.addButton((btn) => {
-        btn.setButtonText(`+${minutes} min`).onClick(() => {
-          this.addDurationMinutes(minutes);
-        });
-        durationButtonsEl.appendChild(btn.buttonEl);
-        this.durationAddButtons.push(btn);
-      });
-    }
-
-    durationSetting.addButton((btn) => {
-      this.resetButton = btn;
-      btn.setButtonText("Reset").onClick(() => {
-        this.resetDuration();
-      });
-      durationButtonsEl.appendChild(btn.buttonEl);
-    });
-
     const endTimeSetting = new Setting(this.contentEl).setName("End time");
-
-    endTimeSetting.settingEl.addClass("audio-recording-timer-end-time-setting");
-
+    endTimeSetting.settingEl.addClass(
+      "audio-recording-timer-end-time-setting",
+    );
     const endTimeControlEl = endTimeSetting.controlEl.createDiv({
       cls: "audio-recording-timer-end-time-control",
     });
 
     this.endTimeHours = new DropdownComponent(endTimeControlEl);
-    this.endTimeHours.selectEl.addClass("audio-recording-timer-end-time-dropdown");
+    this.endTimeHours.selectEl.addClass(
+      "audio-recording-timer-end-time-dropdown",
+    );
+    this.endTimeHours.addOption("", "--");
     for (let hour = 0; hour < 24; hour++) {
       const value = hour.toString().padStart(2, "0");
       this.endTimeHours.addOption(value, value);
     }
 
-    endTimeControlEl.createSpan({ cls: "audio-recording-timer-end-time-separator", text: ":" });
+    endTimeControlEl.createSpan({
+      cls: "audio-recording-timer-end-time-separator",
+      text: ":",
+    });
 
     this.endTimeMinutes = new DropdownComponent(endTimeControlEl);
-    this.endTimeMinutes.selectEl.addClass("audio-recording-timer-end-time-dropdown");
+    this.endTimeMinutes.selectEl.addClass(
+      "audio-recording-timer-end-time-dropdown",
+    );
+    this.endTimeMinutes.addOption("", "--");
     for (let minute = 0; minute < 60; minute++) {
       const value = minute.toString().padStart(2, "0");
       this.endTimeMinutes.addOption(value, value);
     }
 
-    this.syncEndTimeControls();
+    this.resetButton = new ButtonComponent(endTimeControlEl)
+      .setButtonText("Reset")
+      .setDisabled(true)
+      .onClick(() => {
+        this.resetSelection();
+      });
+    this.resetButton.buttonEl.addClass(
+      "audio-recording-timer-end-time-reset",
+    );
+
     this.endTimeHours.onChange(() => this.handleEndTimeChange());
     this.endTimeMinutes.onChange(() => this.handleEndTimeChange());
 
-    this.updateDurationDisplay();
+    this.selectionMessageEl = this.contentEl.createDiv({
+      cls: "audio-recording-timer-selection-message",
+      attr: { "aria-live": "polite" },
+    });
 
     new Setting(this.contentEl)
-      .addButton((btn) =>
-        (this.startButton = btn)
+      .addButton((button) => {
+        this.startButton = button;
+        button
           .setButtonText("Start")
           .setCta()
-          .setDisabled(this.durationMinutes <= 0)
-          .onClick(() => void this.handleStart()),
-      )
-      .addButton((btn) => btn.setButtonText("Cancel").onClick(() => this.close()));
+          .setDisabled(true)
+          .onClick(() => void this.handleStart());
+      })
+      .addButton((button) =>
+        button.setButtonText("Cancel").onClick(() => this.close()),
+      );
+
+    const nowMs = Date.now();
+    this.syncEndTimeControls();
+    this.refreshQuickEndTimesIfChanged(new Date(nowMs), true);
+    this.updateDisplay(nowMs);
+    this.tickIntervalId = window.setInterval(() => {
+      this.handleTick(Date.now());
+    }, TICK_INTERVAL_MS);
   }
 
   onClose(): void {
+    if (this.tickIntervalId !== undefined) {
+      window.clearInterval(this.tickIntervalId);
+      this.tickIntervalId = undefined;
+    }
     this.contentEl.empty();
   }
 
+  private renderQuickEndTimes(candidates: Date[], now: Date): void {
+    if (!this.quickEndTimeButtonsEl) return;
+
+    this.quickEndTimeButtonsEl.empty();
+    this.quickEndTimeButtons = [];
+
+    for (const candidate of candidates) {
+      const nextDaySuffix = isDifferentLocalDay(candidate, now)
+        ? " (+1d)"
+        : "";
+      const button = new ButtonComponent(this.quickEndTimeButtonsEl)
+        .setButtonText(`${formatClockTime(candidate)}${nextDaySuffix}`)
+        .onClick(() => {
+          this.selectQuickEndTime(candidate);
+        });
+      button.buttonEl.addClass(
+        "audio-recording-timer-quick-end-time-button",
+      );
+      this.quickEndTimeButtons.push({
+        stopAtMs: candidate.getTime(),
+        button,
+      });
+    }
+
+    this.updateQuickEndTimeButtonState();
+  }
+
+  private selectQuickEndTime(candidate: Date): void {
+    this.stopAtMs = candidate.getTime();
+    this.setSelectionMessage("");
+    this.syncEndTimeControls();
+    this.updateDisplay(Date.now());
+  }
+
   private addDurationMinutes(minutesToAdd: number): void {
-    this.stopAtMode = "duration";
-    const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, this.durationMinutes + minutesToAdd));
-    this.durationMinutes = minutes;
-    this.stopAtMs = Date.now() + minutesToMs(minutes);
-
-    this.isSyncing = true;
-    try {
-      this.syncEndTimeControls();
-    } finally {
-      this.isSyncing = false;
+    const nowMs = Date.now();
+    if (this.stopAtMs === undefined) return;
+    if (nowMs >= this.stopAtMs) {
+      this.resetSelection(
+        "Selected end time has passed. Choose a new end time.",
+        nowMs,
+      );
+      return;
     }
 
-    this.updateDurationDisplay();
-    this.updateStartButtonState();
-  }
-
-  private updateFromEndTime(value: string): void {
-    this.stopAtMode = "endTime";
-    const now = new Date();
-    const candidate = computeStopAtFromEndTime(now, value);
-    if (!candidate) return;
-
-    const nowMs = now.getTime();
-    const candidateMs = candidate.getTime();
-    const diffMinutes = Math.ceil((candidateMs - nowMs) / 60_000);
-    const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, Math.round(diffMinutes)));
-
-    this.durationMinutes = minutes;
-    this.stopAtMs = diffMinutes > MAX_DURATION_MINUTES ? nowMs + minutesToMs(minutes) : candidateMs;
-
-    this.isSyncing = true;
-    try {
-      this.syncEndTimeControls();
-    } finally {
-      this.isSyncing = false;
-    }
-
-    this.updateDurationDisplay();
-    this.updateStartButtonState();
-  }
-
-  private updateDurationDisplay(): void {
-    if (this.durationValueEl && this.durationClockEl) {
-      const formatted = minutesToDurationInputValue(this.durationMinutes);
-      this.durationValueEl.setText(`${this.durationMinutes} min`);
-      this.durationClockEl.setText(`(${formatted})`);
-    }
-
-    const atMax = this.durationMinutes >= MAX_DURATION_MINUTES;
-    if (this.durationMaxEl) {
-      this.durationMaxEl.setText(atMax ? "Maximum duration is 6 hours." : "");
-    }
-
-    for (const btn of this.durationAddButtons) {
-      btn.setDisabled(atMax);
-    }
-
-    this.resetButton?.setDisabled(this.durationMinutes === 0);
-  }
-
-  private resetDuration(): void {
-    this.stopAtMode = "duration";
-    this.durationMinutes = 0;
-    this.stopAtMs = Date.now();
-
-    this.isSyncing = true;
-    try {
-      this.syncEndTimeControls();
-    } finally {
-      this.isSyncing = false;
-    }
-
-    this.updateDurationDisplay();
-    this.updateStartButtonState();
-  }
-
-  private updateStartButtonState(): void {
-    this.startButton?.setDisabled(this.durationMinutes <= 0);
+    const maxStopAtMs = computeMinuteAlignedMaxStopAt(nowMs);
+    this.stopAtMs = Math.min(
+      this.stopAtMs + minutesToMs(minutesToAdd),
+      maxStopAtMs,
+    );
+    this.setSelectionMessage("");
+    this.syncEndTimeControls();
+    this.updateDisplay(nowMs);
   }
 
   private handleEndTimeChange(): void {
     if (this.isSyncing) return;
-    const hours = this.endTimeHours?.getValue();
-    const minutes = this.endTimeMinutes?.getValue();
-    if (!hours || !minutes) return;
-    this.updateFromEndTime(`${hours}:${minutes}`);
+
+    const hours = this.endTimeHours?.getValue() ?? "";
+    const minutes = this.endTimeMinutes?.getValue() ?? "";
+    const now = new Date();
+
+    if (!hours || !minutes) {
+      this.stopAtMs = undefined;
+      this.durationMinutes = 0;
+      this.setSelectionMessage("");
+      this.refreshQuickEndTimesIfChanged(now, true);
+      this.updateDisplay(now.getTime());
+      return;
+    }
+
+    const candidate = computeStopAtFromEndTime(
+      now,
+      `${hours}:${minutes}`,
+    );
+    if (!candidate) return;
+
+    const nowMs = now.getTime();
+    const maxStopAtMs = computeMinuteAlignedMaxStopAt(nowMs);
+    this.stopAtMs = Math.min(candidate.getTime(), maxStopAtMs);
+    this.setSelectionMessage("");
+    this.syncEndTimeControls();
+    this.updateDisplay(nowMs);
   }
 
   private syncEndTimeControls(): void {
-    const [hours, minutes] = toTimeInputValue(new Date(this.stopAtMs)).split(":");
-    if (!hours || !minutes) return;
-    this.endTimeHours?.setValue(hours);
-    this.endTimeMinutes?.setValue(minutes);
+    this.isSyncing = true;
+    try {
+      if (this.stopAtMs === undefined) {
+        this.endTimeHours?.setValue("");
+        this.endTimeMinutes?.setValue("");
+        return;
+      }
+
+      const [hours, minutes] = toTimeInputValue(
+        new Date(this.stopAtMs),
+      ).split(":");
+      if (!hours || !minutes) return;
+      this.endTimeHours?.setValue(hours);
+      this.endTimeMinutes?.setValue(minutes);
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+
+  private handleTick(nowMs: number): void {
+    if (this.stopAtMs === undefined) {
+      this.refreshQuickEndTimesIfChanged(new Date(nowMs));
+      return;
+    }
+
+    if (nowMs >= this.stopAtMs) {
+      this.resetSelection(
+        "Selected end time has passed. Choose a new end time.",
+        nowMs,
+      );
+      return;
+    }
+
+    this.updateDisplay(nowMs);
+  }
+
+  private refreshQuickEndTimesIfChanged(
+    now: Date,
+    force = false,
+  ): void {
+    const candidates = computeQuickEndTimes(
+      now,
+      this.plugin.getQuickEndTimeRangeMinutes(),
+    );
+    const changed =
+      candidates.length !== this.quickEndTimes.length ||
+      candidates.some(
+        (candidate, index) =>
+          candidate.getTime() !== this.quickEndTimes[index]?.getTime(),
+      );
+    if (!force && !changed) return;
+
+    this.quickEndTimes = candidates;
+    this.renderQuickEndTimes(candidates, now);
+  }
+
+  private resetSelection(message = "", nowMs = Date.now()): void {
+    this.stopAtMs = undefined;
+    this.durationMinutes = 0;
+    this.setSelectionMessage(message);
+    this.syncEndTimeControls();
+    this.refreshQuickEndTimesIfChanged(new Date(nowMs), true);
+    this.updateDisplay(nowMs);
+  }
+
+  private updateDisplay(nowMs: number): void {
+    const hasSelection = this.stopAtMs !== undefined;
+    this.durationMinutes = hasSelection
+      ? remainingMinutesUntil(this.stopAtMs ?? nowMs, nowMs)
+      : 0;
+
+    if (this.durationValueEl && this.durationClockEl) {
+      this.durationValueEl.setText(`${this.durationMinutes} min`);
+      this.durationClockEl.setText(
+        `(${minutesToDurationInputValue(this.durationMinutes)})`,
+      );
+    }
+
+    const maxStopAtMs = computeMinuteAlignedMaxStopAt(nowMs);
+    const atMax =
+      this.stopAtMs !== undefined && this.stopAtMs >= maxStopAtMs;
+    this.durationMaxEl?.setText(
+      atMax ? "Maximum duration is 6 hours." : "",
+    );
+
+    for (const button of this.durationAddButtons) {
+      button.setDisabled(!hasSelection || atMax);
+    }
+    this.durationButtonsEl?.toggleClass("is-disabled", !hasSelection);
+    this.durationButtonsEl?.setAttribute(
+      "aria-disabled",
+      String(!hasSelection),
+    );
+
+    const hasManualInput =
+      (this.endTimeHours?.getValue() ?? "") !== "" ||
+      (this.endTimeMinutes?.getValue() ?? "") !== "";
+    this.resetButton?.setDisabled(!hasSelection && !hasManualInput);
+    this.startButton?.setDisabled(
+      !hasSelection || this.durationMinutes <= 0,
+    );
+    this.updateQuickEndTimeButtonState();
+  }
+
+  private updateQuickEndTimeButtonState(): void {
+    for (const { stopAtMs, button } of this.quickEndTimeButtons) {
+      const isSelected = this.stopAtMs === stopAtMs;
+      button.buttonEl.toggleClass("is-selected", isSelected);
+      button.buttonEl.setAttribute("aria-pressed", String(isSelected));
+    }
+  }
+
+  private setSelectionMessage(message: string): void {
+    this.selectionMessageEl?.setText(message);
   }
 
   private async handleStart(): Promise<void> {
-    if (this.durationMinutes <= 0) return;
-    let stopAtMs = this.stopAtMs;
-    if (this.stopAtMode === "duration") {
-      stopAtMs = Date.now() + minutesToMs(this.durationMinutes);
-      this.stopAtMs = stopAtMs;
-      this.isSyncing = true;
-      try {
-        this.syncEndTimeControls();
-      } finally {
-        this.isSyncing = false;
-      }
+    const nowMs = Date.now();
+    if (this.stopAtMs === undefined) return;
+    if (nowMs >= this.stopAtMs) {
+      this.resetSelection(
+        "Selected end time has passed. Choose a new end time.",
+        nowMs,
+      );
+      return;
     }
 
-    const ok = await this.plugin.startSessionWithTimer(stopAtMs, this.durationMinutes);
+    const maxStopAtMs = computeMinuteAlignedMaxStopAt(nowMs);
+    if (this.stopAtMs > maxStopAtMs) {
+      this.stopAtMs = maxStopAtMs;
+      this.syncEndTimeControls();
+    }
+
+    const durationMinutes = remainingMinutesUntil(this.stopAtMs, nowMs);
+    if (durationMinutes <= 0) {
+      this.resetSelection(
+        "Selected end time has passed. Choose a new end time.",
+        nowMs,
+      );
+      return;
+    }
+
+    this.durationMinutes = durationMinutes;
+    this.updateDisplay(nowMs);
+    const ok = await this.plugin.startSessionWithTimer(
+      this.stopAtMs,
+      durationMinutes,
+    );
     if (ok) this.close();
   }
 }

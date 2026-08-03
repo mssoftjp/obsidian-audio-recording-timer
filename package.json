@@ -1,6 +1,6 @@
 {
   "name": "obsidian-audio-recording-timer",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -13,12 +13,13 @@
     "build:dist": "node esbuild.config.mjs production",
     "build": "npm run build:dist && node scripts/export-build.mjs release",
     "build:debug": "node esbuild.config.mjs && node scripts/export-build.mjs debug",
+    "test": "node scripts/run-tests.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit",
     "verify:release": "node scripts/verify-release.mjs",
     "release:check": "npm run verify:release && npm run build",
-    "check": "npm run lint && npm run typecheck"
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

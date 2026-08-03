@@ -1,4 +1,10 @@
-import { MAX_DURATION_MINUTES } from "./constants";
+import {
+  DEFAULT_QUICK_END_TIME_RANGE_MINUTES,
+  MAX_DURATION_MINUTES,
+  MAX_QUICK_END_TIME_RANGE_MINUTES,
+  MIN_QUICK_END_TIME_RANGE_MINUTES,
+  QUICK_END_TIME_RANGE_STEP_MINUTES,
+} from "./constants";
 import {
   isAudioRecorderStartCommandId,
   isAudioRecorderStopCommandId,
@@ -10,10 +16,11 @@ export interface ActiveSession {
 }
 
 export interface AudioRecordingTimerData {
-  version: 1;
+  version: 2;
   startCommandId?: string;
   stopCommandId?: string;
   lastDurationMinutes?: number;
+  quickEndTimeRangeMinutes: number;
   activeSession?: ActiveSession;
 }
 
@@ -21,10 +28,11 @@ export const DEFAULT_LAST_DURATION_MINUTES = 25;
 
 export function createDefaultData(): AudioRecordingTimerData {
   return {
-    version: 1,
+    version: 2,
     startCommandId: "audio-recorder:start",
     stopCommandId: "audio-recorder:stop",
     lastDurationMinutes: DEFAULT_LAST_DURATION_MINUTES,
+    quickEndTimeRangeMinutes: DEFAULT_QUICK_END_TIME_RANGE_MINUTES,
   };
 }
 
@@ -45,6 +53,19 @@ function normalizeLastDurationMinutes(value: unknown): number | undefined {
   if (asNumber === undefined) return undefined;
   const clamped = Math.max(1, Math.min(MAX_DURATION_MINUTES, Math.round(asNumber)));
   return clamped;
+}
+
+export function normalizeQuickEndTimeRangeMinutes(value: unknown): number {
+  const asNumber = toNumber(value);
+  if (asNumber === undefined) return DEFAULT_QUICK_END_TIME_RANGE_MINUTES;
+
+  const rounded =
+    Math.round(asNumber / QUICK_END_TIME_RANGE_STEP_MINUTES) *
+    QUICK_END_TIME_RANGE_STEP_MINUTES;
+  return Math.max(
+    MIN_QUICK_END_TIME_RANGE_MINUTES,
+    Math.min(MAX_QUICK_END_TIME_RANGE_MINUTES, rounded),
+  );
 }
 
 function normalizeActiveSession(value: unknown): ActiveSession | undefined {
@@ -74,7 +95,7 @@ export function normalizeData(raw: unknown): AudioRecordingTimerData {
   if (!isRecord(raw)) return defaults;
 
   return {
-    version: 1,
+    version: 2,
     startCommandId:
       normalizeStartCommandId(raw.startCommandId) ?? defaults.startCommandId,
     stopCommandId:
@@ -82,6 +103,9 @@ export function normalizeData(raw: unknown): AudioRecordingTimerData {
     lastDurationMinutes:
       normalizeLastDurationMinutes(raw.lastDurationMinutes) ??
       defaults.lastDurationMinutes,
+    quickEndTimeRangeMinutes: normalizeQuickEndTimeRangeMinutes(
+      raw.quickEndTimeRangeMinutes,
+    ),
     activeSession: normalizeActiveSession(raw.activeSession),
   };
 }

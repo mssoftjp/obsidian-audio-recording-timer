@@ -5,6 +5,7 @@ import { MAX_DURATION_MINUTES, TICK_INTERVAL_MS } from "./constants";
 import {
   createDefaultData,
   normalizeData,
+  normalizeQuickEndTimeRangeMinutes,
   normalizeStartCommandId,
   normalizeStopCommandId,
 } from "./data";
@@ -105,6 +106,16 @@ export default class AudioRecordingTimerPlugin extends Plugin {
 
   getLastDurationMinutes(): number {
     return this.data.lastDurationMinutes ?? 25;
+  }
+
+  getQuickEndTimeRangeMinutes(): number {
+    return this.data.quickEndTimeRangeMinutes;
+  }
+
+  async setQuickEndTimeRangeMinutes(value: number): Promise<void> {
+    this.data.quickEndTimeRangeMinutes =
+      normalizeQuickEndTimeRangeMinutes(value);
+    await this.saveData(this.data);
   }
 
   getActiveSession(): ActiveSession | undefined {

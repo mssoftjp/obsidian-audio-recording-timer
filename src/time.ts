@@ -1,4 +1,7 @@
-import { MAX_DURATION_MINUTES } from "./constants";
+import {
+  MAX_DURATION_MINUTES,
+  QUICK_END_TIME_INTERVAL_MINUTES,
+} from "./constants";
 
 function pad2(value: number): string {
   return value.toString().padStart(2, "0");
@@ -10,6 +13,47 @@ export function clampMinutes(value: number): number {
 
 export function minutesToMs(minutes: number): number {
   return minutes * 60_000;
+}
+
+export function computeMinuteAlignedMaxStopAt(nowMs: number): number {
+  return (
+    Math.floor(
+      (nowMs + minutesToMs(MAX_DURATION_MINUTES)) / minutesToMs(1),
+    ) * minutesToMs(1)
+  );
+}
+
+export function computeQuickEndTimes(
+  now: Date,
+  rangeMinutes: number,
+): Date[] {
+  const intervalMs = minutesToMs(QUICK_END_TIME_INTERVAL_MINUTES);
+  const threshold = new Date(now.getTime() + intervalMs);
+  const millisecondsPastBoundary =
+    (threshold.getMinutes() % QUICK_END_TIME_INTERVAL_MINUTES) * 60_000 +
+    threshold.getSeconds() * 1000 +
+    threshold.getMilliseconds();
+  const firstCandidateMs =
+    threshold.getTime() +
+    (millisecondsPastBoundary === 0
+      ? 0
+      : intervalMs - millisecondsPastBoundary);
+
+  const candidateCount = Math.max(
+    0,
+    Math.floor(rangeMinutes / QUICK_END_TIME_INTERVAL_MINUTES),
+  );
+  const candidates: Date[] = [];
+
+  for (let index = 0; index < candidateCount; index++) {
+    candidates.push(new Date(firstCandidateMs + index * intervalMs));
+  }
+
+  return candidates;
+}
+
+export function remainingMinutesUntil(stopAtMs: number, nowMs: number): number {
+  return Math.max(0, Math.ceil((stopAtMs - nowMs) / 60_000));
 }
 
 export function formatRemainingMs(remainingMs: number): string {

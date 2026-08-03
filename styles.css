@@ -2,11 +2,16 @@
   accent-color: var(--interactive-accent);
 }
 
+.audio-recording-timer-start-modal
+  .audio-recording-timer-quick-end-time-setting,
 .audio-recording-timer-start-modal .audio-recording-timer-duration-setting {
   flex-direction: column;
   align-items: stretch;
 }
 
+.audio-recording-timer-start-modal
+  .audio-recording-timer-quick-end-time-setting
+  .setting-item-control,
 .audio-recording-timer-start-modal
   .audio-recording-timer-duration-setting
   .setting-item-control {
@@ -15,18 +20,51 @@
   margin-top: 0.5em;
 }
 
+.audio-recording-timer-start-modal
+  .audio-recording-timer-quick-end-time-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5em;
+  width: 100%;
+}
+
+.audio-recording-timer-start-modal
+  .audio-recording-timer-quick-end-time-button {
+  min-width: 0;
+}
+
+.audio-recording-timer-start-modal
+  .audio-recording-timer-quick-end-time-button.is-selected {
+  color: var(--text-on-accent);
+  background-color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
 .audio-recording-timer-start-modal .audio-recording-timer-duration-control {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 0.5em;
+  width: 100%;
+}
+
+.audio-recording-timer-start-modal
+  .audio-recording-timer-duration-buttons.is-disabled {
+  opacity: 0.65;
 }
 
 .audio-recording-timer-start-modal .audio-recording-timer-duration-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.5em;
+  width: 100%;
+}
+
+.audio-recording-timer-start-modal
+  .audio-recording-timer-duration-buttons
+  button {
+  min-width: 0;
+  padding-inline: 0.5em;
 }
 
 .audio-recording-timer-start-modal .audio-recording-timer-duration-total {
@@ -59,7 +97,7 @@
 
 .audio-recording-timer-start-modal .audio-recording-timer-end-time-setting {
   justify-content: flex-start;
-  align-items: baseline;
+  align-items: center;
   gap: 0.75em;
 }
 
@@ -78,15 +116,63 @@
 
 .audio-recording-timer-start-modal .audio-recording-timer-end-time-control {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.35em;
 }
 
 .audio-recording-timer-start-modal .audio-recording-timer-end-time-dropdown {
+  min-width: 5.5em;
   font: inherit;
+  text-align: center;
 }
 
 .audio-recording-timer-start-modal .audio-recording-timer-end-time-separator {
   color: var(--text-muted);
   font-weight: 600;
+}
+
+.audio-recording-timer-start-modal .audio-recording-timer-end-time-reset {
+  margin-inline-start: 0.25em;
+}
+
+.audio-recording-timer-start-modal .audio-recording-timer-selection-message {
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+}
+
+.audio-recording-timer-start-modal
+  .audio-recording-timer-selection-message:empty {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .audio-recording-timer-start-modal
+    .audio-recording-timer-quick-end-time-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audio-recording-timer-start-modal
+    .audio-recording-timer-quick-end-time-button {
+    width: 100%;
+  }
+
+  .audio-recording-timer-start-modal
+    .audio-recording-timer-duration-buttons
+    button {
+    padding-inline: 0.25em;
+    font-size: var(--font-ui-smaller);
+  }
+
+  .audio-recording-timer-start-modal
+    .audio-recording-timer-end-time-setting {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .audio-recording-timer-start-modal
+    .audio-recording-timer-end-time-setting
+    .setting-item-control {
+    justify-content: flex-start;
+  }
 }

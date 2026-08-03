@@ -46,4 +46,15 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ["tests/**/*.ts"],
+    rules: {
+      ...obsidianRulesOff,
+      "import/no-nodejs-modules": "off",
+    },
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: { project: "./tsconfig.tests.json" },
+    },
+  },
 ]);
