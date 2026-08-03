@@ -16,3 +16,6 @@ build/release/*
 .env.local
 AGENTS.md
 spec/
+
+# Local Superpowers implementation plans
+/docs/superpowers/plans/
