@@ -1,15 +1,15 @@
 import type AudioRecordingTimerPlugin from "./main";
-import { App, PluginSettingTab, Setting } from "obsidian";
+import type { SettingDefinition } from "obsidian";
+import { App, PluginSettingTab } from "obsidian";
 import {
   detectAudioRecorderCommandIds,
   filterAudioRecorderStartCommands,
   filterAudioRecorderStopCommands,
 } from "./command-utils";
 import {
-  MAX_QUICK_END_TIME_RANGE_MINUTES,
-  MIN_QUICK_END_TIME_RANGE_MINUTES,
-  QUICK_END_TIME_RANGE_STEP_MINUTES,
-} from "./constants";
+  createAudioRecordingTimerSettingDefinitions,
+  QUICK_END_TIME_RANGE_KEY,
+} from "./settings-definitions";
 import { CommandPickerModal } from "./modals/command-picker-modal";
 import { listObsidianCommands } from "./obsidian-commands";
 
@@ -21,94 +21,67 @@ export class AudioRecordingTimerSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
+  getSettingDefinitions(): SettingDefinition[] {
+    return createAudioRecordingTimerSettingDefinitions({
+      getStartCommandId: () => this.plugin.getStartCommandId(),
+      getStopCommandId: () => this.plugin.getStopCommandId(),
+      setStartCommandId: (value) => this.plugin.setStartCommandId(value),
+      setStopCommandId: (value) => this.plugin.setStopCommandId(value),
+      openStartCommandPicker: () => this.openCommandPicker("start"),
+      openStopCommandPicker: () => this.openCommandPicker("stop"),
+      autoDetectCommands: () => this.autoDetectCommands(),
+    });
+  }
 
+  getControlValue(key: string): unknown {
+    if (key !== QUICK_END_TIME_RANGE_KEY) {
+      throw new Error(`Unknown setting key: ${key}`);
+    }
+
+    return this.plugin.getQuickEndTimeRangeMinutes().toString();
+  }
+
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    if (key !== QUICK_END_TIME_RANGE_KEY) {
+      throw new Error(`Unknown setting key: ${key}`);
+    }
+
+    await this.plugin.setQuickEndTimeRangeMinutes(Number(value));
+  }
+
+  private openCommandPicker(kind: "start" | "stop"): void {
     const commands = listObsidianCommands(this.app);
-    const startCommands = filterAudioRecorderStartCommands(commands);
-    const stopCommands = filterAudioRecorderStopCommands(commands);
+    const matchingCommands = kind === "start"
+      ? filterAudioRecorderStartCommands(commands)
+      : filterAudioRecorderStopCommands(commands);
 
-    new Setting(containerEl)
-      .setName("Quick end time range")
-      .setDesc("Show rounded end-time choices up to this approximate duration.")
-      .addDropdown((dropdown) => {
-        for (
-          let minutes = MIN_QUICK_END_TIME_RANGE_MINUTES;
-          minutes <= MAX_QUICK_END_TIME_RANGE_MINUTES;
-          minutes += QUICK_END_TIME_RANGE_STEP_MINUTES
-        ) {
-          dropdown.addOption(
-            minutes.toString(),
-            this.formatRangeMinutes(minutes),
-          );
-        }
-
-        dropdown
-          .setValue(this.plugin.getQuickEndTimeRangeMinutes().toString())
-          .onChange((value) => {
-            void this.saveQuickEndTimeRange(Number(value));
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Start command")
-      .setDesc("Command ID used to start core audio recording.")
-      .addText((text) => {
-        text.setValue(this.plugin.getStartCommandId() ?? "");
-        text.onChange((value) => {
-          void this.plugin.setStartCommandId(value.trim());
-        });
-      })
-      .addButton((btn) =>
-        btn.setButtonText("Pick").onClick(() => {
-          new CommandPickerModal(this.app, startCommands, (command) => {
-            void this.plugin.setStartCommandId(command.id);
-            this.display();
-          }).open();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName("Stop command")
-      .setDesc("Command ID used to stop core audio recording.")
-      .addText((text) => {
-        text.setValue(this.plugin.getStopCommandId() ?? "");
-        text.onChange((value) => {
-          void this.plugin.setStopCommandId(value.trim());
-        });
-      })
-      .addButton((btn) =>
-        btn.setButtonText("Pick").onClick(() => {
-          new CommandPickerModal(this.app, stopCommands, (command) => {
-            void this.plugin.setStopCommandId(command.id);
-            this.display();
-          }).open();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName("Auto-detect commands")
-      .setDesc("Try to find core audio recorder start/stop commands automatically.")
-      .addButton((btn) =>
-        btn.setButtonText("Auto-detect").onClick(() => {
-          const detected = detectAudioRecorderCommandIds(commands);
-          if (detected.startCommandId) void this.plugin.setStartCommandId(detected.startCommandId);
-          if (detected.stopCommandId) void this.plugin.setStopCommandId(detected.stopCommandId);
-          this.display();
-        }),
-      );
+    new CommandPickerModal(this.app, matchingCommands, (command) => {
+      void this.saveCommandAndRefresh(kind, command.id);
+    }).open();
   }
 
-  private formatRangeMinutes(minutes: number): string {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    if (remainingMinutes === 0) return `${hours} hours`;
-    return `${hours} hours ${remainingMinutes} minutes`;
+  private async saveCommandAndRefresh(
+    kind: "start" | "stop",
+    commandId: string,
+  ): Promise<void> {
+    if (kind === "start") {
+      await this.plugin.setStartCommandId(commandId);
+    } else {
+      await this.plugin.setStopCommandId(commandId);
+    }
+    this.update();
   }
 
-  private async saveQuickEndTimeRange(value: number): Promise<void> {
-    await this.plugin.setQuickEndTimeRangeMinutes(value);
-    this.display();
+  private async autoDetectCommands(): Promise<void> {
+    const detected = detectAudioRecorderCommandIds(
+      listObsidianCommands(this.app),
+    );
+    if (detected.startCommandId) {
+      await this.plugin.setStartCommandId(detected.startCommandId);
+    }
+    if (detected.stopCommandId) {
+      await this.plugin.setStopCommandId(detected.stopCommandId);
+    }
+    this.update();
   }
 }
